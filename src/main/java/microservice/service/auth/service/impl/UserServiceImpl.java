@@ -6,10 +6,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import microservice.service.auth.dto.request.LoginRequest;
 import microservice.service.auth.dto.request.RegisterRequest;
 import microservice.service.auth.dto.response.UserResponse;
 import microservice.service.auth.enums.Role;
 import microservice.service.auth.exception.ConflictException;
+import microservice.service.auth.exception.UnauthorizedException;
 import microservice.service.auth.mapper.UserMapper;
 import microservice.service.auth.model.User;
 import microservice.service.auth.repository.UserRepository;
@@ -58,5 +60,17 @@ public class UserServiceImpl implements UserService {
         User entity = userMapper.toNewUser(normalized, hash, role, now);
         User saved = userRepository.save(entity);
         return userMapper.toResponse(saved);
+    }
+
+    @Override
+    public UserResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new UnauthorizedException("Credenciales inválidas"));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new UnauthorizedException("Credenciales inválidas");
+        }
+
+        return userMapper.toResponse(user);
     }
 }
