@@ -1,14 +1,17 @@
 package microservice.service.auth.service;
 
-import org.springframework.stereotype.Service;
+import java.util.UUID;
 
 import microservice.service.auth.dto.request.LoginRequest;
 import microservice.service.auth.dto.request.RegisterRequest;
+import microservice.service.auth.dto.response.AuthResponse;
 import microservice.service.auth.dto.response.UserResponse;
 
-@Service
 public interface UserService {
 
-    UserResponse register(RegisterRequest request);
-    UserResponse login(LoginRequest request);
+    AuthResponse register(RegisterRequest request);
+
+    AuthResponse login(LoginRequest request);
+
+    UserResponse getProfile(UUID userId);
 }
