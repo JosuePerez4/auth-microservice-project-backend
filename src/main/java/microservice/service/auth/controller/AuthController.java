@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import microservice.service.auth.dto.request.LoginRequest;
 import microservice.service.auth.dto.request.RegisterRequest;
 import microservice.service.auth.dto.response.UserResponse;
 import microservice.service.auth.service.UserService;
@@ -28,5 +29,12 @@ public class AuthController {
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         UserResponse body = userService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    @PostMapping("/login")
+    @Operation(summary = "Iniciar sesión", description = "Autentica al usuario devolviendo sus datos en el response si son correctos")
+    public ResponseEntity<UserResponse> login(@Valid @RequestBody LoginRequest request) {
+        UserResponse response = userService.login(request);
+        return ResponseEntity.ok(response);
     }
 }

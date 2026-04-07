@@ -1,5 +1,6 @@
 package microservice.service.auth.repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,4 +13,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByDocumentNumber(String documentNumber);
     boolean existsByEmail(String email);
     boolean existsByEmailAndDocumentNumber(String email, String documentNumber);
+    Optional<User> findByEmail(String email);
 }
