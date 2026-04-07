@@ -1,6 +1,7 @@
 package microservice.service.auth.service.impl;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -8,7 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import microservice.service.auth.dto.request.LoginRequest;
 import microservice.service.auth.dto.request.RegisterRequest;
+import microservice.service.auth.dto.response.AuthResponse;
 import microservice.service.auth.dto.response.UserResponse;
+import microservice.service.auth.security.JwtTokenService;
 import microservice.service.auth.enums.Role;
 import microservice.service.auth.exception.ConflictException;
 import microservice.service.auth.exception.UnauthorizedException;
@@ -25,10 +28,11 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final JwtTokenService jwtTokenService;
 
     @Override
     @Transactional
-    public UserResponse register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request) {
         String email = request.getEmail().trim().toLowerCase();
         String documentNumber = request.getDocumentNumber().trim();
 
@@ -59,18 +63,40 @@ public class UserServiceImpl implements UserService {
 
         User entity = userMapper.toNewUser(normalized, hash, role, now);
         User saved = userRepository.save(entity);
-        return userMapper.toResponse(saved);
+        return toAuthResponse(saved);
     }
 
     @Override
-    public UserResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+    public AuthResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
                 .orElseThrow(() -> new UnauthorizedException("Credenciales inválidas"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new UnauthorizedException("Credenciales inválidas");
         }
 
+        return toAuthResponse(user);
+    }
+
+    @Override
+    public UserResponse getProfile(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
         return userMapper.toResponse(user);
+    }
+
+    private AuthResponse toAuthResponse(User user) {
+        String token = jwtTokenService.generateAccessToken(user);
+        return AuthResponse.builder()
+                .accessToken(token)
+                .name(displayName(user))
+                .build();
+    }
+
+    private static String displayName(User user) {
+        String first = user.getFirstName() != null ? user.getFirstName().trim() : "";
+        String last = user.getLastName() != null ? user.getLastName().trim() : "";
+        String combined = (first + " " + last).trim();
+        return combined.isEmpty() ? first : combined;
     }
 }
