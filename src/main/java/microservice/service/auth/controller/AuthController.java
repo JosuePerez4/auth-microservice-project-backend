@@ -13,13 +13,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import microservice.service.auth.dto.request.LoginRequest;
 import microservice.service.auth.dto.request.RegisterRequest;
 import microservice.service.auth.dto.response.AuthResponse;
 import microservice.service.auth.dto.response.UserResponse;
 import microservice.service.auth.security.JwtPrincipal;
 import microservice.service.auth.service.UserService;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/auth")
