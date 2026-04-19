@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 		"spring.datasource.username=sa",
 		"spring.datasource.password=",
 		"jwt.secret=test-jwt-secret-must-be-at-least-32-chars!!",
+		"FRONTEND_URL=http://localhost:5173",
 		"spring.jpa.hibernate.ddl-auto=create-drop",
 		"spring.jpa.show-sql=false"
 })
