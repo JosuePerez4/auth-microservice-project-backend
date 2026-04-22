@@ -1,10 +1,14 @@
 package microservice.service.auth.security;
 
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
-
-import javax.crypto.SecretKey;
 
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -13,7 +17,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import microservice.service.auth.config.JwtProperties;
 import microservice.service.auth.enums.Role;
@@ -26,32 +29,24 @@ public class JwtTokenService {
 
     private static final String CLAIM_EMAIL = "email";
     private static final String CLAIM_ROLE = "role";
-    private static final int MIN_HMAC_KEY_BYTES = 32;
-
     private final JwtProperties jwtProperties;
-    private SecretKey signingKey;
+    private PrivateKey signingKey;
+    private PublicKey verificationKey;
 
     @PostConstruct
     void init() {
-        String secret = jwtProperties.getSecret();
-        if (!StringUtils.hasText(secret)) {
-            throw new IllegalStateException("jwt.secret debe estar definido (p. ej. JWT_SECRET en el entorno)");
-        }
-        byte[] keyBytes;
-        if (secret.startsWith("base64:")) {
-            keyBytes = Decoders.BASE64.decode(secret.substring("base64:".length()).trim());
-        } else {
-            keyBytes = secret.getBytes(StandardCharsets.UTF_8);
-        }
-        if (keyBytes.length < MIN_HMAC_KEY_BYTES) {
+        String privateKeyRaw = jwtProperties.getPrivateKey();
+        String publicKeyRaw = jwtProperties.getPublicKey();
+        if (!StringUtils.hasText(privateKeyRaw) || !StringUtils.hasText(publicKeyRaw)) {
             throw new IllegalStateException(
-                    ("JWT_SECRET / jwt.secret demasiado corto (%d bytes; mínimo %d). Para HS256 hacen falta al menos 32 "
-                            + "caracteres en texto plano, o `base64:` + Base64 de 32+ bytes. Si usas .env pero falla, "
-                            + "revisa que no tengas JWT_SECRET o AUTH_JWT_SECRET corto en el entorno del IDE/sistema "
-                            + "(tienen prioridad sobre el archivo).")
-                                    .formatted(keyBytes.length, MIN_HMAC_KEY_BYTES));
+                    "jwt.private-key y jwt.public-key deben estar definidos (p. ej. AUTH_JWT_PRIVATE_KEY y AUTH_JWT_PUBLIC_KEY)");
         }
-        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        try {
+            this.signingKey = parsePrivateKey(privateKeyRaw);
+            this.verificationKey = parsePublicKey(publicKeyRaw);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudieron cargar las claves RSA para JWT", e);
+        }
     }
 
     public String generateAccessToken(User user) {
@@ -69,7 +64,7 @@ public class JwtTokenService {
 
     public JwtPrincipal parseAndValidate(String token) {
         Claims claims = Jwts.parser()
-                .verifyWith(signingKey)
+                .verifyWith(verificationKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -82,6 +77,35 @@ public class JwtTokenService {
         }
         Role role = Role.valueOf(roleName);
         return new JwtPrincipal(id, email, role);
+    }
+
+    private static PrivateKey parsePrivateKey(String rawKey) throws Exception {
+        String normalized = normalizePemOrBase64(rawKey)
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
+                .trim();
+        byte[] keyBytes = Decoders.BASE64.decode(normalized);
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+        return KeyFactory.getInstance("RSA").generatePrivate(keySpec);
+    }
+
+    private static PublicKey parsePublicKey(String rawKey) throws Exception {
+        String normalized = normalizePemOrBase64(rawKey)
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .trim();
+        byte[] keyBytes = Decoders.BASE64.decode(normalized);
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
+        return KeyFactory.getInstance("RSA").generatePublic(keySpec);
+    }
+
+    private static String normalizePemOrBase64(String value) {
+        String normalized = value.trim().replace("\\n", "\n");
+        if (normalized.startsWith("base64:")) {
+            byte[] decoded = Base64.getDecoder().decode(normalized.substring("base64:".length()).trim());
+            return new String(decoded, StandardCharsets.UTF_8);
+        }
+        return normalized;
     }
 
 }

@@ -2,13 +2,11 @@ package microservice.service.auth.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import lombok.Getter;
-import lombok.Setter;
-
-@Getter
-@Setter
+import lombok.Data;
+@Data
 @ConfigurationProperties(prefix = "jwt")
 public class JwtProperties {
-    private String secret;
-    private long expirationMs = 86_400_000L;
+    private String privateKey;
+    private String publicKey;
+    private long expirationMs = 3600;
 }
