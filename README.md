@@ -12,6 +12,9 @@ persiste usuarios en PostgreSQL mediante JPA.
   error JSON.
 - **Datos:** JPA/Hibernate sobre PostgreSQL en ejecucion normal; H2 se declara
   para pruebas.
+- **Operacion:** Spring Boot Actuator esta presente para endpoints operativos,
+  pero la configuracion de seguridad actual protege cualquier ruta que no sea
+  publica de forma explicita.
 - **Empaquetado:** Maven Wrapper y Docker multi-stage con Temurin 21.
 
 Flujo principal:
@@ -118,7 +121,8 @@ Content-Type: application/json
   "password": "password-seguro",
   "institution": "Example University",
   "country": "CO",
-  "city": "Bogota"
+  "city": "Bogota",
+  "role": "AUTHOR"
 }
 ```
 
@@ -137,7 +141,9 @@ Restricciones verificadas:
 - `email` se guarda en minusculas.
 - `documentNumber` y `email` deben ser unicos.
 - `password` debe tener entre 8 y 128 caracteres.
-- Si no se envia `role`, se asigna `AUTHOR`.
+- `role` es opcional; si no se envia, se asigna `AUTHOR`. El endpoint publico
+  acepta cualquier valor definido en el enum, por lo que los clientes no deben
+  enviar roles elevados salvo que el flujo de producto lo requiera.
 - Roles definidos: `ADMIN`, `CHAIR`, `AUTHOR`, `ASISTANT`.
 
 ### Login
@@ -198,7 +204,10 @@ Respuesta `200 OK`:
 - Son publicos `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,
   `/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`, `/error` y todas las
   peticiones `OPTIONS`.
-- Cualquier otro endpoint requiere `Authorization: Bearer <jwt>`.
+- Cualquier otro endpoint requiere `Authorization: Bearer <jwt>`. Esto incluye
+  las rutas de Actuator que Spring Boot exponga, como `/actuator` o
+  `/actuator/health`, porque no aparecen en la lista publica de
+  `SecurityConfig`.
 - `FRONTEND_URL` configura los patrones de origen permitidos por CORS. Cuando
   haya varios origenes, separalos con comas sin espacios obligatorios:
   `https://app.example.com,https://admin.example.com`.
@@ -229,7 +238,9 @@ Codigos relevantes:
 
 - `400 Bad Request`: JSON mal formado o validaciones de entrada.
 - `401 Unauthorized`: token ausente/invalido o credenciales invalidas.
-- `403 Forbidden`: autenticado sin permisos suficientes.
+- `403 Forbidden`: autenticado sin permisos suficientes. La superficie actual
+  solo exige autenticacion, no reglas por rol, pero existe un handler JSON para
+  denegaciones de acceso futuras o de filtros de Spring Security.
 - `409 Conflict`: correo o documento duplicado.
 
 ## Docker
@@ -260,10 +271,19 @@ como usuario no root. Puedes pasar opciones JVM con `JAVA_OPTS`.
 - `JWT_EXPIRATION_MS` debe resolverse a numero. Si falta, Spring intenta enlazar
   el literal `${JWT_EXPIRATION_MS}` y el arranque falla.
 - `FRONTEND_URL` no tiene default; si falta, el contexto de Spring no arranca.
+- Si faltan las claves JWT, `JwtTokenService` detiene el arranque. El mensaje de
+  excepcion menciona `AUTH_JWT_PRIVATE_KEY` y `AUTH_JWT_PUBLIC_KEY`, pero los
+  nombres que enlaza `application.properties` son `JWT_PRIVATE_KEY` y
+  `JWT_PUBLIC_KEY`.
+- Actuator esta en las dependencias, pero no hay propiedades `management.*` que
+  cambien su exposicion. Verifica en tu ambiente que el endpoint requerido este
+  expuesto y llama las rutas operativas con JWT salvo que se agreguen a la lista
+  publica de seguridad.
 - Las dependencias incluyen AMQP, pero no hay listeners, publishers ni colas en
   el codigo actual. No asumas integracion con RabbitMQ hasta que exista codigo
   que la use.
-- El test de contexto actual no define `jwt.private-key`, `jwt.public-key` ni
-  `jwt.expiration-ms`; al ejecutar `./mvnw -B test` sin esas propiedades, falla
-  durante el arranque de Spring. Exporta valores JWT de prueba o ajusta las
-  propiedades del test antes de usarlo como verificacion de CI.
+- El test de contexto actual define `jwt.secret`, pero el servicio enlaza
+  `jwt.private-key`, `jwt.public-key` y `jwt.expiration-ms`. Al ejecutar
+  `./mvnw -B test` sin esas propiedades reales, el contexto falla durante el
+  arranque de Spring. Exporta valores RSA de prueba o ajusta las propiedades del
+  test antes de usarlo como verificacion de CI.
