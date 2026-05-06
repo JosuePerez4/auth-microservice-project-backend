@@ -3,6 +3,8 @@ HELP.md
 .env
 .env.local
 *.env.local
+private_key.pem
+public_key.pem
 
 target/
 .mvn/wrapper/maven-wrapper.jar
