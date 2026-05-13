@@ -98,6 +98,37 @@ El documento OpenAPI se expone en:
 http://localhost:8082/v3/api-docs
 ```
 
+## Runbook de arranque y verificacion
+
+1. Crea o exporta las variables de `Configuracion requerida`. No guardes claves
+   reales en el repositorio; usa `.env` local o secretos del entorno.
+2. Verifica que PostgreSQL acepte conexiones con `SPRING_DATASOURCE_URL`,
+   `SPRING_DATASOURCE_USERNAME` y `SPRING_DATASOURCE_PASSWORD`.
+3. Arranca el servicio con `./mvnw spring-boot:run` o con la imagen Docker.
+4. Confirma que la documentacion publica responde:
+
+   ```bash
+   curl -i http://localhost:8082/v3/api-docs
+   curl -i http://localhost:8082/swagger-ui.html
+   ```
+
+5. Registra o autentica un usuario para obtener `accessToken` y prueba una ruta
+   protegida:
+
+   ```bash
+   curl -i -X POST http://localhost:8082/api/v1/auth/login \
+     -H 'Content-Type: application/json' \
+     -d '{"email":"ada@example.com","password":"password-seguro"}'
+
+   TOKEN='<accessToken devuelto por login o register>'
+   curl -i http://localhost:8082/api/v1/auth/me \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+
+6. Si tu despliegue usa Actuator, recuerda que no existe whitelist para
+   `/actuator/**` en `SecurityConfig`: cualquier endpoint de Actuator expuesto por
+   Spring pasa por la regla global y requiere `Authorization: Bearer <jwt>`.
+
 ## API publica
 
 ### Registrar usuario
@@ -204,6 +235,14 @@ Respuesta `200 OK`:
   `https://app.example.com,https://admin.example.com`.
 - CORS permite credenciales, todos los headers de entrada y expone el header
   `Authorization`.
+- El preflight `OPTIONS` es publico, pero la peticion real a cualquier endpoint
+  no listado como publico sigue requiriendo un Bearer valido.
+- El filtro JWT solo acepta cabeceras con prefijo exacto `Bearer `. Si el token
+  falta, esta vencido, usa otra clave publica o no contiene `sub`, `email` y
+  `role`, la autenticacion se limpia y Spring responde con `401`.
+- El claim `sub` debe ser un UUID de usuario. `GET /api/v1/auth/me` valida el
+  token y luego carga ese usuario desde base de datos; si ya no existe, responde
+  `401 Unauthorized`.
 
 ## Formato de errores
 
@@ -252,18 +291,27 @@ como usuario no root. Puedes pasar opciones JVM con `JAVA_OPTS`.
 
 ## Operacion y pitfalls
 
+| Sintoma | Causa probable | Accion |
+| --- | --- | --- |
+| Fallo de arranque por `${SPRING_DATASOURCE_URL}` | No se definio la URL JDBC y no hay default. | Define `SPRING_DATASOURCE_URL` apuntando a PostgreSQL accesible. |
+| Fallo de arranque por `${JWT_EXPIRATION_MS}` | El placeholder no tiene default en `application.properties`. | Define un numero en milisegundos, por ejemplo `3600000`. |
+| `No se pudieron cargar las claves RSA para JWT` | Las claves no son PKCS#8/X.509, estan truncadas o el prefijo `base64:` contiene contenido invalido. | Regenera el par con los comandos de OpenSSL y carga ambas claves del mismo par. |
+| Fallo de arranque por `FRONTEND_URL` | `SecurityConfig` inyecta la variable sin default. | Define al menos un origen o patron permitido, por ejemplo `http://localhost:5173`. |
+| Preflight CORS funciona pero la llamada real devuelve `401` | `OPTIONS` es publico, pero el endpoint real esta protegido. | Envia `Authorization: Bearer <jwt>` y confirma que el origen esta en `FRONTEND_URL`. |
+| `GET /api/v1/auth/me` devuelve `401` con token aparentemente valido | El token vencio, fue firmado con otra clave, le faltan claims obligatorios o el usuario del `sub` ya no existe. | Reautentica al usuario y verifica que el despliegue use el mismo par RSA para firmar y validar. |
+
+Notas operativas:
+
 - `spring.jpa.hibernate.ddl-auto=update` permite que Hibernate actualice el
   esquema automaticamente. Revisa esta configuracion antes de usar el servicio
   en produccion si necesitas migraciones controladas.
 - `spring.jpa.show-sql=true` y `hibernate.format_sql=true` imprimen SQL en logs;
   ajustalos para ambientes donde el volumen o la sensibilidad de logs importen.
-- `JWT_EXPIRATION_MS` debe resolverse a numero. Si falta, Spring intenta enlazar
-  el literal `${JWT_EXPIRATION_MS}` y el arranque falla.
-- `FRONTEND_URL` no tiene default; si falta, el contexto de Spring no arranca.
 - Las dependencias incluyen AMQP, pero no hay listeners, publishers ni colas en
   el codigo actual. No asumas integracion con RabbitMQ hasta que exista codigo
   que la use.
-- El test de contexto actual no define `jwt.private-key`, `jwt.public-key` ni
-  `jwt.expiration-ms`; al ejecutar `./mvnw -B test` sin esas propiedades, falla
-  durante el arranque de Spring. Exporta valores JWT de prueba o ajusta las
-  propiedades del test antes de usarlo como verificacion de CI.
+- El test de contexto actual define `jwt.secret`, pero el servicio usa
+  `jwt.private-key`, `jwt.public-key` y `jwt.expiration-ms`; al ejecutar
+  `./mvnw -B test` sin esas propiedades RSA, falla durante el arranque de
+  Spring. Exporta valores JWT de prueba o ajusta las propiedades del test antes
+  de usarlo como verificacion de CI.
