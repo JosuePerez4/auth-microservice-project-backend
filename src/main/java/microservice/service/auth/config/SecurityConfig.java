@@ -40,6 +40,11 @@ public class SecurityConfig {
             "/v3/api-docs/**"
     };
 
+    private static final String[] ACTUATOR = {
+            "/actuator",
+            "/actuator/**"
+    };
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint;
     private final JsonAccessDeniedHandler jsonAccessDeniedHandler;
@@ -64,6 +69,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_AUTH).permitAll()
                         .requestMatchers(SWAGGER_AND_OPENAPI).permitAll()
+                        .requestMatchers(ACTUATOR).permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
