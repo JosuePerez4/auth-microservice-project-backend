@@ -1,7 +1,14 @@
 package microservice.service.auth.service.impl;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -10,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import microservice.service.auth.dto.request.LoginRequest;
 import microservice.service.auth.dto.request.RegisterRequest;
 import microservice.service.auth.dto.response.AuthResponse;
+import microservice.service.auth.dto.response.PaperAuthorResponse;
 import microservice.service.auth.dto.response.UserResponse;
+import microservice.service.auth.exception.BadRequestException;
 import microservice.service.auth.security.JwtTokenService;
 import microservice.service.auth.enums.Role;
 import microservice.service.auth.exception.ConflictException;
@@ -24,6 +33,10 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
+
+    private static final Set<Role> PAPER_AUTHOR_ROLES = Set.of(Role.AUTHOR, Role.GUEST_SPOKER);
+    private static final int SEARCH_MIN_QUERY_LENGTH = 2;
+    private static final int SEARCH_MAX_RESULTS = 20;
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
@@ -83,6 +96,59 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
         return userMapper.toResponse(user);
+    }
+
+    @Override
+    public List<PaperAuthorResponse> validatePaperAuthors(List<UUID> userIds) {
+        List<UUID> distinctIds = normalizeAuthorIds(userIds);
+        List<User> found = userRepository.findByIdInAndRoleIn(distinctIds, PAPER_AUTHOR_ROLES);
+
+        if (found.size() != distinctIds.size()) {
+            Set<UUID> validIds = found.stream().map(User::getId).collect(Collectors.toSet());
+            List<UUID> invalid = distinctIds.stream()
+                    .filter(id -> !validIds.contains(id))
+                    .toList();
+            throw new BadRequestException(
+                    "Usuarios no encontrados o sin rol AUTHOR/GUEST_SPOKER: " + invalid);
+        }
+
+        Map<UUID, User> byId = found.stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+        return distinctIds.stream()
+                .map(id -> toPaperAuthorResponse(byId.get(id)))
+                .toList();
+    }
+
+    @Override
+    public List<PaperAuthorResponse> searchPaperAuthorCandidates(String query) {
+        String normalized = query != null ? query.trim() : "";
+        if (normalized.length() < SEARCH_MIN_QUERY_LENGTH) {
+            throw new BadRequestException(
+                    "La búsqueda debe tener al menos " + SEARCH_MIN_QUERY_LENGTH + " caracteres");
+        }
+
+        return userRepository.searchPaperAuthorCandidates(normalized, PAPER_AUTHOR_ROLES).stream()
+                .limit(SEARCH_MAX_RESULTS)
+                .map(this::toPaperAuthorResponse)
+                .toList();
+    }
+
+    private static List<UUID> normalizeAuthorIds(List<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            throw new BadRequestException("Debe indicar al menos un autor");
+        }
+        return new ArrayList<>(new LinkedHashSet<>(userIds));
+    }
+
+    private PaperAuthorResponse toPaperAuthorResponse(User user) {
+        return PaperAuthorResponse.builder()
+                .id(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .displayName(displayName(user))
+                .role(user.getRole())
+                .build();
     }
 
     private AuthResponse toAuthResponse(User user) {
