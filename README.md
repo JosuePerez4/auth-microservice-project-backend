@@ -12,6 +12,8 @@ persiste usuarios en PostgreSQL mediante JPA.
   error JSON.
 - **Datos:** JPA/Hibernate sobre PostgreSQL en ejecucion normal; H2 se declara
   para pruebas.
+- **Descubrimiento/operacion:** cliente Eureka por autoconfiguracion de Spring
+  Cloud y Actuator con `health`/`info`.
 - **Empaquetado:** Maven Wrapper y Docker multi-stage con Temurin 21.
 
 Flujo principal:
@@ -38,7 +40,7 @@ Variables principales:
 
 | Variable | Uso | Notas |
 | --- | --- | --- |
-| `PORT` | Puerto HTTP | Default: `8082`. |
+| `PORT` | Puerto HTTP | Default del codigo: `8081`. El ejemplo local usa `8082`. |
 | `SPRING_DATASOURCE_URL` | JDBC de PostgreSQL | Requerida en runtime. |
 | `SPRING_DATASOURCE_USERNAME` | Usuario de BD | Default vacio. |
 | `SPRING_DATASOURCE_PASSWORD` | Password de BD | Default vacio. |
@@ -46,6 +48,7 @@ Variables principales:
 | `JWT_PUBLIC_KEY` | Clave RSA publica para validar JWT | Requerida. Debe ser X.509. |
 | `JWT_EXPIRATION_MS` | Duracion del token en milisegundos | Requerida por el placeholder actual. |
 | `FRONTEND_URL` | Origenes CORS permitidos | Requerida; acepta lista separada por comas. |
+| `EUREKA_SERVER_URL` | URL `defaultZone` del servidor Eureka | Requerida por la configuracion actual. |
 
 Ejemplo local sin secretos reales:
 
@@ -56,6 +59,7 @@ SPRING_DATASOURCE_USERNAME=auth_user
 SPRING_DATASOURCE_PASSWORD=change-me
 JWT_EXPIRATION_MS=3600000
 FRONTEND_URL=http://localhost:5173,http://localhost:3000
+EUREKA_SERVER_URL=http://localhost:8761/eureka
 JWT_PRIVATE_KEY=base64:<private-key-pem-base64>
 JWT_PUBLIC_KEY=base64:<public-key-pem-base64>
 ```
@@ -86,16 +90,23 @@ Comandos comunes:
 ./mvnw -B package
 ```
 
-Swagger UI queda disponible en:
+Swagger UI queda disponible en el puerto configurado por `PORT`:
 
 ```text
-http://localhost:8082/swagger-ui.html
+http://localhost:<port>/swagger-ui.html
 ```
 
 El documento OpenAPI se expone en:
 
 ```text
-http://localhost:8082/v3/api-docs
+http://localhost:<port>/v3/api-docs
+```
+
+Actuator expone probes operativas publicas:
+
+```text
+http://localhost:<port>/actuator/health
+http://localhost:<port>/actuator/info
 ```
 
 ## API publica
@@ -198,12 +209,18 @@ Respuesta `200 OK`:
 - Son publicos `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,
   `/swagger-ui.html`, `/swagger-ui/**`, `/v3/api-docs/**`, `/error` y todas las
   peticiones `OPTIONS`.
+- Tambien son publicos `/actuator` y `/actuator/**`; la configuracion actual
+  solo expone `health` e `info`.
 - Cualquier otro endpoint requiere `Authorization: Bearer <jwt>`.
 - `FRONTEND_URL` configura los patrones de origen permitidos por CORS. Cuando
   haya varios origenes, separalos con comas sin espacios obligatorios:
   `https://app.example.com,https://admin.example.com`.
 - CORS permite credenciales, todos los headers de entrada y expone el header
   `Authorization`.
+- El rol viaja en el JWT como autoridad `ROLE_<rol>`, pero los endpoints
+  actuales no aplican reglas por rol (`@PreAuthorize` o similares). En
+  particular, `RegisterRequest` acepta `role`; si se omite, el servicio asigna
+  `AUTHOR`.
 
 ## Formato de errores
 
@@ -250,6 +267,23 @@ La imagen compila el JAR con Maven en una etapa de build, copia
 `target/auth-0.0.1-SNAPSHOT.jar` a una imagen JRE Alpine y ejecuta el proceso
 como usuario no root. Puedes pasar opciones JVM con `JAVA_OPTS`.
 
+El Dockerfile declara `EXPOSE 8082`, pero la aplicacion usa `PORT=8081` si no
+se configura otra cosa. Para el comando anterior, deja `PORT=8082` en `.env`;
+si omites `PORT`, publica `-p 8081:8081`.
+
+## Descubrimiento de servicios y health checks
+
+El proyecto incluye `spring-cloud-starter-netflix-eureka-client` y configura
+`eureka.client.service-url.defaultZone` con `EUREKA_SERVER_URL`. En entornos que
+usan descubrimiento, apunta esa variable al servidor Eureka, por ejemplo:
+`http://localhost:8761/eureka`. Si ejecutas el servicio sin Eureka, define una
+estrategia explicita para tu entorno (por ejemplo, deshabilitar el cliente con
+configuracion externa) en lugar de dejar el placeholder sin resolver.
+
+Actuator expone solamente `health` e `info`; `health` tiene probes habilitados y
+`show-details=always`. Revisa esa visibilidad antes de publicar el endpoint en
+redes no confiables.
+
 ## Operacion y pitfalls
 
 - `spring.jpa.hibernate.ddl-auto=update` permite que Hibernate actualice el
@@ -260,10 +294,13 @@ como usuario no root. Puedes pasar opciones JVM con `JAVA_OPTS`.
 - `JWT_EXPIRATION_MS` debe resolverse a numero. Si falta, Spring intenta enlazar
   el literal `${JWT_EXPIRATION_MS}` y el arranque falla.
 - `FRONTEND_URL` no tiene default; si falta, el contexto de Spring no arranca.
+- `EUREKA_SERVER_URL` no tiene default; si falta, la configuracion de Eureka
+  queda incompleta para el arranque o registro del cliente.
 - Las dependencias incluyen AMQP, pero no hay listeners, publishers ni colas en
   el codigo actual. No asumas integracion con RabbitMQ hasta que exista codigo
   que la use.
-- El test de contexto actual no define `jwt.private-key`, `jwt.public-key` ni
-  `jwt.expiration-ms`; al ejecutar `./mvnw -B test` sin esas propiedades, falla
-  durante el arranque de Spring. Exporta valores JWT de prueba o ajusta las
-  propiedades del test antes de usarlo como verificacion de CI.
+- El test de contexto actual declara `jwt.secret`, pero la aplicacion usa
+  `jwt.private-key`, `jwt.public-key` y `jwt.expiration-ms`; al ejecutar
+  `./mvnw -B test` sin esas propiedades RSA, falla durante el arranque de
+  Spring. Exporta valores JWT de prueba o ajusta las propiedades del test antes
+  de usarlo como verificacion de CI.
