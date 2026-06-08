@@ -4,5 +4,6 @@ public enum Role {
     ADMIN,
     CHAIR,
     AUTHOR,
-    ASISTANT
+    ASISTANT,
+    GUEST_SPOKER
 }

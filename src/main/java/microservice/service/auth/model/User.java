@@ -42,6 +42,9 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "role")
     private Role role;
+    @Column(name = "active")
+    private Boolean active = true;
     private String createdAt;
     private String updatedAt;
 }
+
