@@ -26,6 +26,7 @@ public class UserResponse {
     private String country;
     private String city;
     private Role role;
+    private Boolean active;
     private String createdAt;
     private String updatedAt;
 }

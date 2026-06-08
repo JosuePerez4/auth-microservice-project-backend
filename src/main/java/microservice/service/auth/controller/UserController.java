@@ -17,6 +17,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import microservice.service.auth.dto.request.ValidatePaperAuthorsRequest;
 import microservice.service.auth.dto.response.PaperAuthorResponse;
+import microservice.service.auth.dto.response.UserResponse;
 import microservice.service.auth.dto.response.ValidatePaperAuthorsResponse;
 import microservice.service.auth.service.UserService;
 
@@ -47,5 +48,27 @@ public class UserController {
     public ResponseEntity<List<PaperAuthorResponse>> searchPaperAuthorCandidates(
             @RequestParam("q") String query) {
         return ResponseEntity.ok(userService.searchPaperAuthorCandidates(query));
+    }
+
+    @GetMapping("/chairs")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Listar usuarios registrados como CHAIR",
+            description = "Requiere rol ADMIN",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<List<UserResponse>> getChairs() {
+        return ResponseEntity.ok(userService.getChairs());
+    }
+
+    @PostMapping("/chairs/{id}/activate")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Activar/Aceptar usuario CHAIR",
+            description = "Activa a un usuario CHAIR para permitirle el acceso al sistema. Requiere rol ADMIN",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<Void> activateChair(
+            @org.springframework.web.bind.annotation.PathVariable("id") java.util.UUID id) {
+        userService.activateChair(id);
+        return ResponseEntity.ok().build();
     }
 }

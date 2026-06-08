@@ -23,6 +23,7 @@ public class UserMapper {
         user.setCountry(trimToNull(request.getCountry()));
         user.setCity(trimToNull(request.getCity()));
         user.setRole(effectiveRole);
+        user.setActive(effectiveRole != Role.CHAIR);
         user.setCreatedAt(nowIso);
         user.setUpdatedAt(nowIso);
         return user;
@@ -41,6 +42,7 @@ public class UserMapper {
                 .country(user.getCountry())
                 .city(user.getCity())
                 .role(user.getRole())
+                .active(user.getActive() == null ? true : user.getActive())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

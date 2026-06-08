@@ -23,8 +23,11 @@ import microservice.service.auth.security.JsonAccessDeniedHandler;
 import microservice.service.auth.security.JsonAuthenticationEntryPoint;
 import microservice.service.auth.security.JwtAuthenticationFilter;
 
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 

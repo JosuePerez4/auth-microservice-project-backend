@@ -20,4 +20,8 @@ public interface UserService {
     List<PaperAuthorResponse> validatePaperAuthors(List<UUID> userIds);
 
     List<PaperAuthorResponse> searchPaperAuthorCandidates(String query);
+
+    List<UserResponse> getChairs();
+
+    void activateChair(UUID userId);
 }

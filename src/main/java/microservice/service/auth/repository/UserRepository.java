@@ -33,4 +33,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             ORDER BY u.lastName, u.firstName
             """)
     List<User> searchPaperAuthorCandidates(@Param("query") String query, @Param("roles") Collection<Role> roles);
+
+    List<User> findByRole(Role role);
 }

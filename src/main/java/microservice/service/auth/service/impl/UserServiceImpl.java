@@ -88,6 +88,10 @@ public class UserServiceImpl implements UserService {
             throw new UnauthorizedException("Credenciales inválidas");
         }
 
+        if (Boolean.FALSE.equals(user.getActive())) {
+            throw new UnauthorizedException("Su cuenta de CHAIR aún no ha sido aprobada por el administrador.");
+        }
+
         return toAuthResponse(user);
     }
 
@@ -131,6 +135,26 @@ public class UserServiceImpl implements UserService {
                 .limit(SEARCH_MAX_RESULTS)
                 .map(this::toPaperAuthorResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> getChairs() {
+        return userRepository.findByRole(Role.CHAIR).stream()
+                .map(userMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void activateChair(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Usuario no encontrado"));
+        if (user.getRole() != Role.CHAIR) {
+            throw new BadRequestException("El usuario no tiene rol CHAIR");
+        }
+        user.setActive(true);
+        userRepository.save(user);
     }
 
     private static List<UUID> normalizeAuthorIds(List<UUID> userIds) {
