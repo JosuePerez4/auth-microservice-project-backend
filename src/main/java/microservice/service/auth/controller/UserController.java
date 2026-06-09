@@ -27,48 +27,36 @@ import microservice.service.auth.service.UserService;
 @Tag(name = "Usuarios", description = "Consulta y validación de usuarios para papers")
 public class UserController {
 
-    private final UserService userService;
+        private final UserService userService;
 
-    @PostMapping("/paper-authors/validate")
-    @Operation(
-            summary = "Validar autores de un paper",
-            description = "Comprueba que los IDs existen y tienen rol AUTHOR o GUEST_SPOKER",
-            security = @SecurityRequirement(name = "bearerAuth"))
-    public ResponseEntity<ValidatePaperAuthorsResponse> validatePaperAuthors(
-            @Valid @RequestBody ValidatePaperAuthorsRequest request) {
-        List<PaperAuthorResponse> authors = userService.validatePaperAuthors(request.getUserIds());
-        return ResponseEntity.ok(new ValidatePaperAuthorsResponse(authors));
-    }
+        @PostMapping("/paper-authors/validate")
+        @Operation(summary = "Validar autores de un paper", description = "Comprueba que los IDs existen y tienen rol AUTHOR o GUEST_SPOKER", security = @SecurityRequirement(name = "bearerAuth"))
+        public ResponseEntity<ValidatePaperAuthorsResponse> validatePaperAuthors(
+                        @Valid @RequestBody ValidatePaperAuthorsRequest request) {
+                List<PaperAuthorResponse> authors = userService.validatePaperAuthors(request.getUserIds());
+                return ResponseEntity.ok(new ValidatePaperAuthorsResponse(authors));
+        }
 
-    @GetMapping("/paper-authors/search")
-    @Operation(
-            summary = "Buscar candidatos a coautor",
-            description = "Busca por email o nombre entre usuarios AUTHOR o GUEST_SPOKER",
-            security = @SecurityRequirement(name = "bearerAuth"))
-    public ResponseEntity<List<PaperAuthorResponse>> searchPaperAuthorCandidates(
-            @RequestParam("q") String query) {
-        return ResponseEntity.ok(userService.searchPaperAuthorCandidates(query));
-    }
+        @GetMapping("/paper-authors/search")
+        @Operation(summary = "Buscar candidatos a coautor", description = "Busca por email o nombre entre usuarios AUTHOR o GUEST_SPOKER", security = @SecurityRequirement(name = "bearerAuth"))
+        public ResponseEntity<List<PaperAuthorResponse>> searchPaperAuthorCandidates(
+                        @RequestParam("q") String query) {
+                return ResponseEntity.ok(userService.searchPaperAuthorCandidates(query));
+        }
 
-    @GetMapping("/chairs")
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
-    @Operation(
-            summary = "Listar usuarios registrados como CHAIR",
-            description = "Requiere rol ADMIN",
-            security = @SecurityRequirement(name = "bearerAuth"))
-    public ResponseEntity<List<UserResponse>> getChairs() {
-        return ResponseEntity.ok(userService.getChairs());
-    }
+        @GetMapping("/chairs")
+        @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Listar usuarios registrados como CHAIR", description = "Requiere rol ADMIN", security = @SecurityRequirement(name = "bearerAuth"))
+        public ResponseEntity<List<UserResponse>> getChairs() {
+                return ResponseEntity.ok(userService.getChairs());
+        }
 
-    @PostMapping("/chairs/{id}/activate")
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
-    @Operation(
-            summary = "Activar/Aceptar usuario CHAIR",
-            description = "Activa a un usuario CHAIR para permitirle el acceso al sistema. Requiere rol ADMIN",
-            security = @SecurityRequirement(name = "bearerAuth"))
-    public ResponseEntity<Void> activateChair(
-            @org.springframework.web.bind.annotation.PathVariable("id") java.util.UUID id) {
-        userService.activateChair(id);
-        return ResponseEntity.ok().build();
-    }
+        @PostMapping("/chairs/{id}/activate")
+        @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Activar/Aceptar usuario CHAIR", description = "Activa a un usuario CHAIR para permitirle el acceso al sistema. Requiere rol ADMIN", security = @SecurityRequirement(name = "bearerAuth"))
+        public ResponseEntity<Void> activateChair(
+                        @org.springframework.web.bind.annotation.PathVariable("id") java.util.UUID id) {
+                userService.activateChair(id);
+                return ResponseEntity.ok().build();
+        }
 }
