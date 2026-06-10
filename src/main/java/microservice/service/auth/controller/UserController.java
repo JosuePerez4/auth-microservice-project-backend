@@ -59,4 +59,14 @@ public class UserController {
                 userService.activateChair(id);
                 return ResponseEntity.ok().build();
         }
+
+        @PostMapping("/chairs/{id}/deactivate")
+        @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Desactivar/Rechazar usuario CHAIR", description = "Desactiva a un usuario CHAIR. Requiere rol ADMIN", security = @SecurityRequirement(name = "bearerAuth"))
+        public ResponseEntity<Void> deactivateChair(
+                        @org.springframework.web.bind.annotation.PathVariable("id") java.util.UUID id) {
+                userService.deactivateChair(id);
+                return ResponseEntity.ok().build();
+        }
+
 }
