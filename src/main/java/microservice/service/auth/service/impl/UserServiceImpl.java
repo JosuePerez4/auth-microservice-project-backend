@@ -157,6 +157,19 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
     }
 
+    @Override
+    @Transactional
+    public void deactivateChair(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Usuario no encontrado"));
+        if (user.getRole() != Role.CHAIR) {
+            throw new BadRequestException("El usuario no tiene rol CHAIR");
+        }
+        user.setActive(false);
+        userRepository.save(user);
+    }
+
+
     private static List<UUID> normalizeAuthorIds(List<UUID> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             throw new BadRequestException("Debe indicar al menos un autor");

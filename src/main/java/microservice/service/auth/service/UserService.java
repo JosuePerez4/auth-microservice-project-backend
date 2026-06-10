@@ -24,4 +24,7 @@ public interface UserService {
     List<UserResponse> getChairs();
 
     void activateChair(UUID userId);
+
+    void deactivateChair(UUID userId);
 }
+
